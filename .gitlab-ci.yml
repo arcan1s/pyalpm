@@ -1,43 +1,46 @@
-image: "archlinux:latest"
-
+# You can override the included template(s) by including variable overrides
+# SAST customization: https://docs.gitlab.com/ee/user/application_security/sast/#customizing-the-sast-settings
+# Secret Detection customization: https://docs.gitlab.com/ee/user/application_security/secret_detection/#customizing-settings
+# Note that environment variables can be set in several places
+# See https://docs.gitlab.com/ee/ci/variables/#cicd-variable-precedence
+image: archlinux:latest
 before_script:
-    - >
-      pacman -Syu --needed --noconfirm
-      make base-devel python python-pkgconfig
-      python-pytest python-pytest-cov python-pytest-pacman
-      python-sphinx python-pylint
+- 'pacman -Syu --needed --noconfirm make base-devel python python-pkgconfig python-pytest
+  python-pytest-cov python-pytest-pacman python-sphinx python-pylint
 
-
+'
 stages:
-  - lint
-  - test
-  - doc
-
-
+- lint
+- test
+- doc
 lint:
   script:
-    - make lint
+  - make lint
   except:
-    - schedules
-
-
+  - schedules
 test:
   script:
-    - make build
-    - PYTEST_OPTIONS="--junitxml=report.xml --cov-report xml" make test
+  - make build
+  - PYTEST_OPTIONS="--junitxml=report.xml --cov-report xml" make test
   artifacts:
     when: always
     reports:
       junit: report.xml
       cobertura: coverage.xml
   except:
-    - schedules
-
+  - schedules
 next:
   only:
-    - schedules
+  - schedules
   script:
-    - pacman -Syu --needed --noconfirm meson git
-    - git clone https://git.archlinux.org/pacman.git
-    - cd pacman && mkdir build && cd build && meson .. && ninja
-    - cd $CI_PROJECT_DIR && PKG_CONFIG_PATH=./pacman/build/meson-uninstalled make build
+  - pacman -Syu --needed --noconfirm meson git
+  - git clone https://git.archlinux.org/pacman.git
+  - cd pacman && mkdir build && cd build && meson .. && ninja
+  - cd $CI_PROJECT_DIR && PKG_CONFIG_PATH=./pacman/build/meson-uninstalled make build
+sast:
+  variables:
+    SAST_EXCLUDED_ANALYZERS: brakeman, eslint, flawfinder, gosec, kubesec, nodejs-scan,
+      phpcs-security-audit, security-code-scan, sobelow, spotbugs
+  stage: test
+include:
+- template: Security/SAST.gitlab-ci.yml
